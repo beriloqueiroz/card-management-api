@@ -148,6 +148,7 @@ dotnet test tests/Cards.IntegrationTests      # requer Docker (Testcontainers)
 | Resiliência | sem integrações externas | circuit breaker/retry (Polly) para gateways e IdP |
 | Rotação do refresh token | delegada ao ZITADEL | idem + detecção de reuso e revogação em cascata |
 | Auditoria | log estruturado | trilha imutável (event sourcing/append-only) + SIEM |
+| CORS | não configurado — não há consumidor browser cross-origin (Swagger é same-origin; curl/testes não são browsers; o leg OAuth cross-origin é respondido pelo próprio ZITADEL) | política restritiva por configuração (`WithOrigins` por ambiente, nunca wildcard) quando existir um SPA em outra origem |
 
 ## Roadmap (evoluções naturais)
 
