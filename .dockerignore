@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/.vs/
+tests/
+docker-compose.yml
+*.md
+*.pdf
+*.sql
+.git/
