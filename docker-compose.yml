@@ -1,0 +1,151 @@
+name: cards
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cards-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${CARDS_POSTGRES_USER:-cards}
+      POSTGRES_PASSWORD: ${CARDS_POSTGRES_PASSWORD:-cards}
+      POSTGRES_DB: ${CARDS_POSTGRES_DB:-cards}
+    ports:
+      - "${CARDS_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - cards_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: cards-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__cards: Host=postgres;Port=5432;Database=${CARDS_POSTGRES_DB:-cards};Username=${CARDS_POSTGRES_USER:-cards};Password=${CARDS_POSTGRES_PASSWORD:-cards}
+      # Dev-only key; override PIN_ENCRYPTION_KEY with a fresh base64 32-byte value in real environments.
+      PinEncryption__Key: ${PIN_ENCRYPTION_KEY:-ZGV2LW9ubHkta2V5LWRvLW5vdC11c2UtaW4tcHJvZCE=}
+      # auth.localhost resolves to the zitadel service inside the compose
+      # network (alias below) and to 127.0.0.1 in browsers, so the token
+      # issuer is the same string everywhere.
+      Auth__Authority: http://auth.localhost:8080
+      Auth__AudienceFile: /zitadel/out/project_id
+      Auth__SwaggerClientIdFile: /zitadel/out/swagger_client_id
+      Auth__RequireHttpsMetadata: "false"
+    volumes:
+      - zitadel_out:/zitadel/out:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      zitadel-bootstrap:
+        condition: service_completed_successfully
+
+  zitadel-postgres:
+    image: postgres:17-alpine
+    container_name: cards-zitadel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${ZITADEL_POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${ZITADEL_POSTGRES_ADMIN_PASSWORD:-postgres}
+      POSTGRES_DB: ${ZITADEL_POSTGRES_DB:-zitadel}
+    volumes:
+      - zitadel_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # The zitadel image runs as uid 1000 and cannot write the PAT into a fresh
+  # root-owned named volume; this one-shot fixes the ownership first.
+  zitadel-volume-init:
+    image: alpine:3.20
+    container_name: cards-zitadel-volume-init
+    restart: "no"
+    command: chown -R 1000:1000 /zitadel/pat
+    volumes:
+      - zitadel_pat:/zitadel/pat
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.65.1
+    container_name: cards-zitadel
+    restart: unless-stopped
+    command: start-from-init --masterkey "${ZITADEL_MASTERKEY:-MasterkeyNeedsToHave32Characters}" --tlsMode disabled
+    ports:
+      - "${ZITADEL_PORT:-8080}:8080"
+    environment:
+      ZITADEL_EXTERNALDOMAIN: auth.localhost
+      ZITADEL_EXTERNALPORT: 8080
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: ${ZITADEL_POSTGRES_DB:-zitadel}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${ZITADEL_POSTGRES_ADMIN_USER:-postgres}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${ZITADEL_POSTGRES_ADMIN_PASSWORD:-postgres}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: ${ZITADEL_POSTGRES_USER:-zitadel}
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_POSTGRES_PASSWORD:-zitadel}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      # Challenge requirement: access tokens live for 30 minutes; renewal goes
+      # through the refresh token grant (ZITADEL rotates the refresh token).
+      ZITADEL_DEFAULTINSTANCE_OIDCSETTINGS_ACCESSTOKENLIFETIME: 30m
+      ZITADEL_DEFAULTINSTANCE_OIDCSETTINGS_IDTOKENLIFETIME: 30m
+      # FirstInstance: org + human admin + service account whose PAT drives
+      # the bootstrap container below. Only runs on a clean volume (down -v).
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ZITADEL_ORG_NAME:-CardCorp}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_ADMIN_EMAIL:-admin@cardcorp.test}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_ADDRESS: ${ZITADEL_ADMIN_EMAIL:-admin@cardcorp.test}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED: "true"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD:-Admin@cards#123}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_FIRSTNAME: Admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_LASTNAME: CardCorp
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: cards-bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Cards Bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2099-12-31T23:59:59Z"
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/pat/pat.txt
+    volumes:
+      - zitadel_pat:/zitadel/pat
+    networks:
+      default:
+        aliases:
+          - auth.localhost
+    depends_on:
+      zitadel-postgres:
+        condition: service_healthy
+      zitadel-volume-init:
+        condition: service_completed_successfully
+
+  zitadel-bootstrap:
+    image: alpine:3.20
+    container_name: cards-zitadel-bootstrap
+    restart: "no"
+    command: sh -c "apk add --no-cache curl jq > /dev/null && sh /bootstrap.sh"
+    environment:
+      ZITADEL_BASE_URL: http://auth.localhost:8080
+      ZITADEL_PAT_FILE: /zitadel/pat/pat.txt
+      OUT_DIR: /zitadel/out
+      SWAGGER_REDIRECT_URI: http://localhost:${API_PORT:-8000}/swagger/oauth2-redirect.html
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-Cards@2026!}
+    volumes:
+      - ./docker/zitadel/bootstrap.sh:/bootstrap.sh:ro
+      - zitadel_pat:/zitadel/pat:ro
+      - zitadel_out:/zitadel/out
+    depends_on:
+      zitadel:
+        condition: service_started
+
+volumes:
+  cards_postgres_data:
+  zitadel_postgres_data:
+  zitadel_pat:
+  zitadel_out:
