@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cards.Domain\Cards.Domain.csproj" />
     <ProjectReference Include="..\..\src\Cards.Application\Cards.Application.csproj" />
+    <ProjectReference Include="..\..\src\Cards.Api\Cards.Api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -81,6 +81,51 @@ public class CreditCardTests
         Assert.Equal(later, card.UpdatedAt);
     }
 
+    [Theory]
+    [InlineData(121)] // cardholderName max is 120
+    public void SetCardholderName_RejectsOversizedValue(int length)
+    {
+        var card = NewCard();
+
+        Assert.Throws<DomainValidationException>(() => card.SetCardholderName(new string('A', length)));
+    }
+
+    [Fact]
+    public void SetNickname_RejectsOversizedValue()
+    {
+        var card = NewCard();
+
+        Assert.Throws<DomainValidationException>(() =>
+            card.SetNickname(new string('a', CreditCard.NicknameMaxLength + 1)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    [InlineData("this-brand-name-is-way-too-long-for-the-forty-char-column")]
+    public void SetBrand_RejectsMissingOrOversizedValue(string? brand)
+    {
+        var card = NewCard();
+
+        Assert.Throws<DomainValidationException>(() => card.SetBrand(brand));
+    }
+
+    [Fact]
+    public void SetPin_RejectsEmptyPayload()
+    {
+        var card = NewCard();
+
+        Assert.Throws<DomainValidationException>(() => card.SetPin([]));
+    }
+
+    [Fact]
+    public void ChangeStatus_RejectsValuesOutsideTheEnum()
+    {
+        var card = NewCard();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => card.ChangeStatus((CardStatus)99));
+    }
+
     [Fact]
     public void ExpressiveStatusTransitions_AreUnrestricted()
     {

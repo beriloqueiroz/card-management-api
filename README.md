@@ -129,7 +129,8 @@ Nuance assumida: este projeto **já** armazena um segredo recuperável — o PIN
 ### Testes
 
 ```bash
-dotnet test                                   # tudo (68 testes)
+dotnet test                                   # tudo (82 testes)
+dotnet test --collect:"XPlat Code Coverage"   # com cobertura (coverlet → coverage.cobertura.xml)
 dotnet test tests/Cards.UnitTests             # domínio + serviços (fakes em memória)
 dotnet test tests/Cards.IntegrationTests      # requer Docker (Testcontainers)
 ```
