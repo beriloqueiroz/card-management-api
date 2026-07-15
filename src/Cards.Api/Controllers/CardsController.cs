@@ -27,7 +27,6 @@ public sealed class CardsController(ICardsService cardsService, ICurrentUserProv
         return await cardsService.ListAsync(userId, page, expirationDateFrom, expirationDateTo, ct);
     }
 
-    /// <summary>Gets one card owned by the authenticated user.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<CardResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

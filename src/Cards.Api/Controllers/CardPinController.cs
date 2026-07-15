@@ -15,7 +15,6 @@ namespace Cards.Api.Controllers;
 [Produces("application/json")]
 public sealed class CardPinController(ICardsService cardsService, ICurrentUserProvider currentUser) : ControllerBase
 {
-    /// <summary>Reveals the original PIN of a card owned by the authenticated user.</summary>
     [HttpGet]
     [ProducesResponseType<PinResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

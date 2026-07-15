@@ -100,8 +100,6 @@ public sealed class CardsService(
     {
         var card = await GetOwnedCardAsync(userId, cardId, ct);
 
-        // The service only translates wire values into domain types; the
-        // merge semantics live in the entity.
         var changed = card.ApplyPartialChanges(
             request.CardholderName,
             request.Nickname,

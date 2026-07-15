@@ -32,7 +32,6 @@ var swaggerClientId = FromConfigOrFile("Auth:SwaggerClientId");
 builder.Services.AddControllers();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Application services (composition root keeps Cards.Application framework-free).
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ICardsService, CardsService>();
 builder.Services.AddScoped<ICardAuditLogger, CardAuditLogger>();
