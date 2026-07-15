@@ -10,7 +10,7 @@ Pré-requisito: Docker + Docker Compose.
 docker compose up --build
 ```
 
-Aguarde o serviço `cards-zitadel-bootstrap` concluir (ele provisiona o IdP) e a `cards-api` subir. Depois:
+Aguarde o serviço `cards-zitadel-bootstrap` concluir (ele provisiona o IdP, cerca de 30s, se der erro executo do comando acima novamente) e a `cards-api` subir. Depois:
 
 - **Swagger**: http://localhost:8000/swagger
 - **ZITADEL** (console/login): http://auth.localhost:8080
